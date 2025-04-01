@@ -8,10 +8,11 @@ import {
   SafeAreaView, 
   Modal,
   StatusBar,
-  Dimensions
+  Dimensions,
+  TextInput
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { getFoodApi } from '../utils/api'; 
+import { getFoodApi, getFoodByNameApi } from '../utils/api'; 
 
 // Định nghĩa interface cho món ăn
 interface Food {
@@ -34,8 +35,11 @@ const FoodLoggingScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [availableFoods, setAvailableFoods] = useState<Food[]>([]);
   const [selectedFoods, setSelectedFoods] = useState<Food[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('popular');
+  const [selectedCategory, setSelectedCategory] = useState<string>('main_dish');
   const [modalVisible, setModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchMode, setIsSearchMode] = useState(false);
+  const [searchResults, setSearchResults] = useState<Food[]>([]);
   const [totalNutrition, setTotalNutrition] = useState({
     calories: 0,
     protein: 0,
@@ -44,7 +48,7 @@ const FoodLoggingScreen: React.FC = () => {
   });
 
   // Danh sách các category có sẵn
-  const categories = ['popular', 'main_dish', 'healthy', 'snack', 'drink', 'dessert'];
+  const categories = ['popular', 'main_dish', 'vegetables', 'snack', 'drink', 'dessert'];
   
   // Lấy dữ liệu món ăn
   useEffect(() => {
@@ -65,8 +69,38 @@ const FoodLoggingScreen: React.FC = () => {
     fetchFoodList();
   }, []);
 
+  // Tìm kiếm món ăn theo tên
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    
+    try {
+      setLoading(true);
+      setIsSearchMode(true);
+      const results = await getFoodByNameApi(searchQuery);
+      if (results) {
+        console.log("Kết quả tìm kiếm:", results);
+        setSearchResults(results);
+      }
+    } catch (error) {
+      console.error("Lỗi tìm kiếm:", error);
+      setSearchResults([]);
+    } finally {
+      setLoading(false); 
+    }
+  };
+
+  // Reset tìm kiếm và quay lại chế độ xem theo category
+  const resetSearch = () => {
+    setSearchQuery('');
+    setIsSearchMode(false);
+    setSearchResults([]);
+  };
+
   // Lọc món ăn theo category đã chọn
   const filteredFoods = availableFoods.filter(food => food.category.includes(selectedCategory));
+
+  // Hiển thị danh sách món ăn (kết quả tìm kiếm hoặc theo category)
+  const displayedFoods = isSearchMode ? searchResults : filteredFoods;
 
   // Thêm món ăn vào danh sách đã chọn
   const handleSelectFood = (food: Food) => {
@@ -110,7 +144,12 @@ const FoodLoggingScreen: React.FC = () => {
         </View>
       </View>
       <View style={styles.foodContent}>
-        <Text style={styles.foodName} numberOfLines={1}>{item.name}</Text>
+        <Text style={styles.foodName} numberOfLines={1}>
+          {item.name}{' '}
+          <Text style={styles.foodWeight}>
+            {item.weight} {item.unit}
+          </Text>
+        </Text>
         <View style={styles.nutritionRow}>
           <View style={styles.nutritionItem}>
             <Text style={styles.nutritionValue}>{item.calories}</Text>
@@ -126,7 +165,7 @@ const FoodLoggingScreen: React.FC = () => {
           </View>
           <View style={styles.nutritionItem}>
             <Text style={styles.nutritionValue}>{item.carbs}g</Text>
-            <Text style={styles.nutritionLabel}>Carbs</Text>
+            <Text style={styles.nutritionLabel}>Tinh bột</Text>
           </View>
         </View>
       </View>
@@ -147,7 +186,7 @@ const FoodLoggingScreen: React.FC = () => {
       <View style={styles.selectedFoodContent}>
         <Text style={styles.selectedFoodName} numberOfLines={1}>{item.name}</Text>
         <Text style={styles.selectedFoodNutrition}>
-          {item.calories} calo | {item.protein}g protein | {item.fat}g chất béo | {item.carbs}g carbs
+          {item.calories} calo | {item.protein}g protein | {item.fat}g chất béo | {item.carbs}g tinh bột
         </Text>
       </View>
       <TouchableOpacity 
@@ -180,7 +219,7 @@ const FoodLoggingScreen: React.FC = () => {
       <View style={styles.summaryCard}>
         <Icon name="grain" size={20} color="#2ecc71" />
         <Text style={styles.summaryValue}>{totalNutrition.carbs}g</Text>
-        <Text style={styles.summaryLabel}>Carbs</Text>
+        <Text style={styles.summaryLabel}>Tinh bột</Text>
       </View>
     </View>
   );
@@ -229,6 +268,34 @@ const FoodLoggingScreen: React.FC = () => {
     </Modal>
   );
 
+  // Render thanh tìm kiếm
+  const renderSearchBar = () => (
+    <View style={styles.searchBarContainer}>
+      <View style={styles.searchInputContainer}>
+        <Icon name="search" size={20} color="#7f8c8d" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Nhập tên món ăn..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+          onSubmitEditing={handleSearch}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Icon name="cancel" size={20} color="#bdc3c7" />
+          </TouchableOpacity>
+        )}
+      </View>
+      <TouchableOpacity 
+        style={styles.searchButton}
+        onPress={handleSearch}
+      >
+        <Text style={styles.searchButtonText}>Tìm kiếm</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -250,53 +317,83 @@ const FoodLoggingScreen: React.FC = () => {
       {/* Hiển thị tổng dinh dưỡng */}
       {renderNutritionSummary()}
 
-      {/* Danh mục món ăn */}
-      <View style={styles.categoriesContainer}>
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={categories}
-          keyExtractor={(item) => item}
-          renderItem={({item}) => (
-            <TouchableOpacity
-              style={[
-                styles.categoryButton,
-                selectedCategory === item && styles.selectedCategoryButton,
-              ]}
-              onPress={() => setSelectedCategory(item)}
-            >
-              <Text
-                style={[
-                  styles.categoryButtonText,
-                  selectedCategory === item && styles.selectedCategoryButtonText,
-                ]}
-              >
-                {item.replace('_', ' ').toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          )}
-          contentContainerStyle={styles.categoriesScroll}
-        />
-      </View>
+      {/* Thanh tìm kiếm */}
+      {renderSearchBar()}
 
-      {/* Danh sách món ăn theo category */}
+      {/* Hiển thị thông tin tìm kiếm và nút quay lại */}
+      {isSearchMode && (
+        <View style={styles.searchStatusContainer}>
+          <Text style={styles.searchStatusText}>
+            Kết quả tìm kiếm: {searchResults.length} món
+          </Text>
+          <TouchableOpacity 
+            style={styles.resetSearchButton}
+            onPress={resetSearch}
+          >
+            <Icon name="arrow-back" size={16} color="#3498db" />
+            <Text style={styles.resetSearchText}>Quay lại danh mục</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Danh mục món ăn - Ẩn khi đang ở chế độ tìm kiếm */}
+      {!isSearchMode && (
+        <View style={styles.categoriesContainer}>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={categories}
+            keyExtractor={(item) => item}
+            renderItem={({item}) => (
+              <TouchableOpacity
+                style={[
+                  styles.categoryButton,
+                  selectedCategory === item && styles.selectedCategoryButton,
+                ]}
+                onPress={() => setSelectedCategory(item)}
+              >
+                <Text
+                  style={[
+                    styles.categoryButtonText,
+                    selectedCategory === item && styles.selectedCategoryButtonText,
+                  ]}
+                >
+                  {item.replace('_', ' ').toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            )}
+            contentContainerStyle={styles.categoriesScroll}
+          />
+        </View>
+      )}
+
+      {/* Danh sách món ăn theo category hoặc kết quả tìm kiếm */}
       <View style={styles.availableFoodsContainer}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Danh sách món ăn</Text>
-          <Text style={styles.sectionSubtitle}>{filteredFoods.length} món</Text>
+          <Text style={styles.sectionTitle}>
+            {isSearchMode ? 'Kết quả tìm kiếm' : 'Danh sách món ăn'}
+          </Text>
+          <Text style={styles.sectionSubtitle}>{displayedFoods.length} món</Text>
         </View>
         
         {loading ? (
           <View style={styles.loadingContainer}>
             <Text>Đang tải...</Text>
           </View>
-        ) : (
+        ) : displayedFoods.length > 0 ? (
           <FlatList
-            data={filteredFoods}
+            data={displayedFoods}
             keyExtractor={item => item._id}
             renderItem={renderFoodItem}
             style={styles.foodsList}
           />
+        ) : (
+          <View style={styles.emptyStateContainer}>
+            <Icon name="no-meals" size={50} color="#ddd" />
+            <Text style={styles.emptyStateText}>
+              {isSearchMode ? 'Không tìm thấy món ăn phù hợp' : 'Không có món ăn trong danh mục này'}
+            </Text>
+          </View>
         )}
       </View>
 
@@ -399,6 +496,73 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#7f8c8d',
   },
+  searchBarContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  searchInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    color: '#2c3e50',
+    fontSize: 16,
+  },
+  searchButton: {
+    backgroundColor: '#3498db',
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  searchButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  searchStatusContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  searchStatusText: {
+    fontSize: 14,
+    color: '#2c3e50',
+    fontWeight: '500',
+  },
+  resetSearchButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  resetSearchText: {
+    marginLeft: 4,
+    color: '#3498db',
+    fontWeight: '600',
+  },
   categoriesContainer: {
     marginBottom: 10,
   },
@@ -486,6 +650,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2c3e50',
     marginBottom: 6,
+  },
+  foodWeight: {
+    fontSize: 12,
+    color: '#7f8c8d',
   },
   nutritionRow: {
     flexDirection: 'row',
@@ -609,6 +777,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: '#95a5a6',
+    textAlign: 'center',
   },
   doneButton: {
     backgroundColor: '#3498db',

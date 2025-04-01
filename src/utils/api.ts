@@ -14,11 +14,18 @@ interface Food {
     image: string,
 }
 
-const getFoodApi = async (): Promise<Food[]> => {
+const getFoodApi = async (): Promise<Food[]> => { // get all food
     const URL_API = "api/food/get";
     return await axios.get(URL_API);
 }
 
+const getFoodByNameApi = async (name: string): Promise<Food[]> => { // get food by name
+    const URL_API = "api/food/get/name";
+    const params = { name: name };
+    return await axios.get(URL_API, { params });
+}
+
+
 export {
-    getFoodApi
+    getFoodApi,getFoodByNameApi 
 }
