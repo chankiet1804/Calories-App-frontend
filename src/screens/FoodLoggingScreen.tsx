@@ -9,25 +9,13 @@ import {
   Modal,
   StatusBar,
   Dimensions,
-  TextInput
+  TextInput,
+  Alert
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { getFoodApi, getFoodByNameApi } from '../utils/api'; 
+import { getFoodApi, getFoodByNameApi,createMealApi } from '../utils/api'; 
+import { Food, Meal } from '../types/type'; 
 
-// Định nghĩa interface cho món ăn
-interface Food {
-  _id: string;
-  name: string;
-  description: string;
-  image: string;
-  calories: number;
-  protein: number;
-  fat: number;
-  carbs: number;
-  category: [string];
-  unit: string;
-  weight: number;
-}
 
 const { width, height } = Dimensions.get('window');
 
@@ -47,8 +35,10 @@ const FoodLoggingScreen: React.FC = () => {
     carbs: 0,
   });
 
+  const [meal, setMeal] = useState<Meal>();
+
   // Danh sách các category có sẵn
-  const categories = ['popular', 'main_dish', 'vegetables', 'snack', 'drink', 'dessert'];
+  const categories = [ 'main_dish', 'vegetables', 'snack', 'drink', 'dessert'];
   
   // Lấy dữ liệu món ăn
   useEffect(() => {
@@ -224,6 +214,33 @@ const FoodLoggingScreen: React.FC = () => {
     </View>
   );
 
+  const handleSubmitMeal = async () => {
+    const userID = '6619a3873a2cd2ff8e1378c1'; // hardcoded cho ví dụ
+    const mealType = 'snack';
+  
+    const mealData: Meal = {
+      userID,
+      mealType,
+      foods: selectedFoods,
+      totalCalories: totalNutrition.calories,
+      totalProtein: totalNutrition.protein,
+      totalFat: totalNutrition.fat,
+      totalCarbs: totalNutrition.carbs,
+      date: new Date().toISOString(),
+    };
+  
+    try {
+      const results = await createMealApi(mealData);
+  
+      Alert.alert('Đã lưu vào thực đơn!');
+      setModalVisible(false);
+    } catch (error) {
+      console.error('Lỗi khi lưu meal:', error);
+      Alert.alert('Có lỗi xảy ra!');
+    }
+  };
+
+
   // Modal hiển thị danh sách món ăn đã chọn
   const renderSelectedFoodsModal = () => (
     <Modal
@@ -250,6 +267,7 @@ const FoodLoggingScreen: React.FC = () => {
               renderItem={renderSelectedFoodItem}
               style={styles.modalFoodsList}
             />
+            
           ) : (
             <View style={styles.emptyStateContainer}>
               <Icon name="restaurant" size={50} color="#ddd" />
@@ -257,12 +275,23 @@ const FoodLoggingScreen: React.FC = () => {
             </View>
           )}
           
-          <TouchableOpacity 
-            style={styles.doneButton}
-            onPress={() => setModalVisible(false)}
-          >
-            <Text style={styles.doneButtonText}>Xong</Text>
-          </TouchableOpacity>
+          <TouchableOpacity
+          style={[styles.doneButton,{ backgroundColor: selectedFoods.length > 0 ? '#2ecc71' : '#bdc3c7' },]}
+          onPress={() => {
+            if (selectedFoods.length > 0) {
+              handleSubmitMeal(); // hàm gửi dữ liệu lên server
+            } else {
+              setModalVisible(false); // đóng modal nếu chưa chọn món
+            }
+          }}
+        >
+          <Text style={styles.doneButtonText}>
+            {selectedFoods.length > 0
+              ? 'Thêm vào thực đơn hôm nay của bạn'
+              : 'Mời bạn lựa chọn món ăn'}
+          </Text>
+        </TouchableOpacity>
+
         </View>
       </View>
     </Modal>
